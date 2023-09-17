@@ -214,6 +214,15 @@ void serve_static(int fd, char *filename, int filesize)
   Close(srcfd);                                               // 파일 디스크립터 닫기
   Rio_writen(fd, srcp, filesize);                             // 데이터를 클라이언트로 전송
   Munmap(srcp, filesize);                                     // 사용한 메모리 매핑 영역 해제
+
+  // Homework Problem 11.9.
+  // 만약 위 코드를 malloc, rio_readn, rio_written을 사용하는 것으로 수정한다면
+  // srcfd = Open(filename, O_RDONLY, 0);  // 요청한 파일을 열고, 해당 파일의 디스크립터를 얻음
+  // srcp = Malloc(filesize);              // 해당 파일의 데이터 크기만큼 메모리를 할당 받음   
+  // Rio_readn(srcfd, srcp, filesize);     // 파일 디스크립터의 내용을 srcp에 작성
+  // Close(srcfd);                         // 파일 디스크립터 닫기                                   
+  // Rio_writen(fd, srcp, filesize);    // 데이터를 클라이언트로 전송
+  // free(srcp);                           // 할당 받은 메모리 해제
 }
 
 /* 파일 이름 바탕으로 파일 타입 파악하기 */
