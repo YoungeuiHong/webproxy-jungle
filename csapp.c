@@ -609,6 +609,21 @@ void Getaddrinfo(const char *node, const char *service,
 }
 /* $end getaddrinfo */
 
+
+/*
+🚀 int getnameinfo(const struct sockaddr *sa, socklen_t salen,
+                char *host, size_t hostlen,
+                char *service, size_t servlen, int flags);
+
+👀 getnameinfo 함수란?
+- It converts a socket address structure to the corresponding host and service name strings. 
+- 이전의 gethostbyaddr, getservbyport 함수와 달리 reentrant하고 protocol-independent함
+
+🤓 getnameinfo 인자와 작동 방식 살펴보기
+- sockaddr 타입의 소켓주소 sa를 받아서 host 버퍼와 service 버퍼에 해당되는 내용을 적어줌
+- 성공하면 0을 반환하고, 실패하면 에러코드를 반환함
+- 호스트명이 필요 없으면 host에 NULL을, hostlen에 0을 전달하면 됨. 서비스명도 마찬가지. 하지만 호스트명과 서비스명 둘 중 하나는 반드시 들어가야 함
+*/
 void Getnameinfo(const struct sockaddr *sa, socklen_t salen, char *host, 
                  size_t hostlen, char *serv, size_t servlen, int flags)
 {
@@ -956,6 +971,24 @@ int open_clientfd(char *hostname, char *port) {
     hints.ai_socktype = SOCK_STREAM;  /* Open a connection */
     hints.ai_flags = AI_NUMERICSERV;  /* ... using a numeric port arg. */
     hints.ai_flags |= AI_ADDRCONFIG;  /* Recommended for connections */
+ 
+    /*
+    🚀 int getaddrinfo(const char *node, const char *service, const struct addrinfo *hints, struct addrinfo **res);
+
+    👀 getaddrinfo 함수란?
+    - 스트링으로 된 호스트 이름, 호스트 주소, 서비스 이름, 포트 번호를 소켓 주소 구조체로 변환함
+    - 험수 호출에 성공하면 0을 반환하고, 실패 시에는 에러 코드를 반환
+    - getaddrinfo 호출에 성공하여 결과로 받은 addrinfo를 활용해서 소켓 생성 및 연결 등 다양한 작업을 수행할 수 있음
+
+    💡 getaddrinfo는 Host and Service Conversion의 일환
+    - Linux는 getaddrinfo 함수와 getnameinfo 함수를 제공하는데,
+    - 이는 binary socket address와 스트링 타입으로 된 호스트 이름, 호스트 주소, 서비스 이름, 포트 번호 간의 변환을 돕는다.
+    - 이 두 함수는 IP protocol의 버전으로부터 독립적인 프로그래밍이 가능하도록 함
+
+    🤔 왜 getaddrinfo를 사용할까?
+    - int network_socket = socket(AF_INET, SOCK_STREAM, 0);과 같은 방식으로 내가 직접 소켓의 도메인, 타입, 프로토콜을 지정할 수도 있지만 best-practice는 getaddrinfo를 사용하는 것
+    - getaddrinfo 함수를 사용해서 이 파라미터들을 자동으로 생성하고 protocol-independent하게 만들 수 있음
+    */
     if ((rc = getaddrinfo(hostname, port, &hints, &listp)) != 0) {
         fprintf(stderr, "getaddrinfo failed (%s:%s): %s\n", hostname, port, gai_strerror(rc));
         return -2;

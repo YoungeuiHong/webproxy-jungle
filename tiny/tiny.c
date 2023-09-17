@@ -39,8 +39,9 @@ int main(int argc, char **argv)
     clientlen = sizeof(clientaddr);
     // 연결 요청 접수
     connfd = Accept(listenfd, (SA *)&clientaddr, &clientlen); // line:netp:tiny:accept
-    Getnameinfo((SA *)&clientaddr, clientlen, hostname, MAXLINE, port, MAXLINE,
-                0);
+
+    
+    Getnameinfo((SA *)&clientaddr, clientlen, hostname, MAXLINE, port, MAXLINE, 0);
     printf("Accepted connection from (%s, %s)\n", hostname, port);
     // 트랜잭션 수행
     doit(connfd); // line:netp:tiny:doit
@@ -245,7 +246,10 @@ void serve_dynamic(int fd, char *filename, char *cgiargs)
   if (Fork() == 0)
   {
     setenv("QUERY_STRING", cgiargs, 1);
-    Dup2(fd, STDOUT_FILENO); 
+    // CGI 프로그램은 자신의 동적 컨텐츠를 표준출력을 보낸다.
+    // 자식 프로세스가 CGI 프로그램을 로드하고 실행하기 전에 리눅스 dup2함수를 사용해서 표준 출력을 클라이언트와 연결된 connection descriptor로 재저징한다.
+    // 따라서 CGI 프로그램이 표준 출력으로 쓰는 모든 것은 클라이언트로 직접 가게 된다.
+    Dup2(fd, STDOUT_FILENO);
     Execve(filename, emptylist, environ);
   }
 
