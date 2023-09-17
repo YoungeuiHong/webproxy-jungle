@@ -11,9 +11,9 @@
 void doit(int fd);
 void read_requesthdrs(rio_t *rp);
 int parse_uri(char *uri, char *filename, char *cgiargs);
-void serve_static(int fd, char *filename, int filesize);
+void serve_static(int fd, char *filename, int filesize, char *method);
 void get_filetype(char *filename, char *filetype);
-void serve_dynamic(int fd, char *filename, char *cgiargs);
+void serve_dynamic(int fd, char *filename, char *cgiargs, char *method);
 void clienterror(int fd, char *cause, char *errnum, char *shortmsg, char *longmsg);
 
 int main(int argc, char **argv)
@@ -68,7 +68,7 @@ void doit(int fd)
   // Tiny 프로그램은 GET 메소드만 지원함
   // 클라이언트가 POST 같은 다른 메소드를 요청하면 에러 메세지를 보내고 main 루틴으로 돌아옴.
   // 그 후에 연결을 닫고 다음 요청을 기다림
-  if (strcasecmp(method, "GET"))
+  if (!(strcasecmp(method, "GET") == 0 || strcasecmp(method, "HEAD") == 0))
   {
     clienterror(fd, method, "501", "Not implemented", "Tiny does not implement this method");
     return;
@@ -95,7 +95,7 @@ void doit(int fd)
       clienterror(fd, filename, "403", "Forbidden", "Tiny couldn't run the CGI program");
       return;
     }
-    serve_static(fd, filename, sbuf.st_size);
+    serve_static(fd, filename, sbuf.st_size, method);
   }
   else
   { // 동적 컨텐츠 요청이라면
@@ -104,7 +104,7 @@ void doit(int fd)
       clienterror(fd, filename, "403", "Forbidden", "Tiny couldn't run the CGI program");
       return;
     }
-    serve_dynamic(fd, filename, cgiargs);
+    serve_dynamic(fd, filename, cgiargs, method);
   }
 }
 
@@ -192,7 +192,7 @@ int parse_uri(char *uri, char *filename, char *cgiargs)
 - filename: 전송할 정적 파일의 이름
 - filesize: 전송할 파일의 크기
 */
-void serve_static(int fd, char *filename, int filesize)
+void serve_static(int fd, char *filename, int filesize, char *method)
 {
   int srcfd;
   char *srcp, filetype[MAXLINE], buf[MAXBUF];
@@ -208,6 +208,9 @@ void serve_static(int fd, char *filename, int filesize)
   printf("Response headers: \n");
   printf("%s", buf);
 
+  if (strcasecmp(method, "HEAD") == 0)
+    return;
+
   // 클라이언트에서 response body 전송
   srcfd = Open(filename, O_RDONLY, 0);                        // 요청한 파일을 열고, 해당 파일의 디스크립터를 얻음
   srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0); // 해당 파일의 데이터를 가상 메모리로 매핑하고, 매핑된 메모리 영역의 시작 주소를 받아옴
@@ -218,9 +221,9 @@ void serve_static(int fd, char *filename, int filesize)
   // Homework Problem 11.9.
   // 만약 위 코드를 malloc, rio_readn, rio_written을 사용하는 것으로 수정한다면
   // srcfd = Open(filename, O_RDONLY, 0);  // 요청한 파일을 열고, 해당 파일의 디스크립터를 얻음
-  // srcp = Malloc(filesize);              // 해당 파일의 데이터 크기만큼 메모리를 할당 받음   
+  // srcp = Malloc(filesize);              // 해당 파일의 데이터 크기만큼 메모리를 할당 받음
   // Rio_readn(srcfd, srcp, filesize);     // 파일 디스크립터의 내용을 srcp에 작성
-  // Close(srcfd);                         // 파일 디스크립터 닫기                                   
+  // Close(srcfd);                         // 파일 디스크립터 닫기
   // Rio_writen(fd, srcp, filesize);    // 데이터를 클라이언트로 전송
   // free(srcp);                           // 할당 받은 메모리 해제
 }
@@ -242,7 +245,7 @@ void get_filetype(char *filename, char *filetype)
     strcpy(filetype, "text/plain");
 }
 
-void serve_dynamic(int fd, char *filename, char *cgiargs)
+void serve_dynamic(int fd, char *filename, char *cgiargs, char *method)
 {
   char buf[MAXLINE], *emptylist[] = {NULL};
 
@@ -251,6 +254,9 @@ void serve_dynamic(int fd, char *filename, char *cgiargs)
   Rio_writen(fd, buf, strlen(buf));
   sprintf(buf, "Server: Tiny Web Server\r\n");
   Rio_writen(fd, buf, strlen(buf));
+
+  if (strcasecmp(method, "HEAD") == 0)
+    return;
 
   if (Fork() == 0)
   {
