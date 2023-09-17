@@ -39,8 +39,6 @@ int main(int argc, char **argv)
     clientlen = sizeof(clientaddr);
     // 연결 요청 접수
     connfd = Accept(listenfd, (SA *)&clientaddr, &clientlen); // line:netp:tiny:accept
-
-    
     Getnameinfo((SA *)&clientaddr, clientlen, hostname, MAXLINE, port, MAXLINE, 0);
     printf("Accepted connection from (%s, %s)\n", hostname, port);
     // 트랜잭션 수행
@@ -229,6 +227,8 @@ void get_filetype(char *filename, char *filetype)
     strcpy(filetype, "image/png");
   else if (strstr(filename, ".jpg"))
     strcpy(filetype, "image/jpeg");
+  else if (strstr(filename, ".mp4"))
+    strcpy(filetype, "video/mp4");
   else
     strcpy(filetype, "text/plain");
 }
