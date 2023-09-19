@@ -1,7 +1,11 @@
 # Targets
 tiny/tiny
 tiny/cgi-bin/adder
+tiny/cgi-bin/form-adder
 proxy
+.noproxy/
+.proxy/
+echo*
 
 # MacOS
 .DS_Store
