@@ -4,17 +4,21 @@
 /* Recommended max cache and object sizes */
 #define MAX_CACHE_SIZE 1049000
 #define MAX_OBJECT_SIZE 102400
+#define HTTP_PORT 80
 
+void *handle_thread(int *socket_fd_pointer);
 void handle_client_request(int clientfd);
 void parse(const char *uri, char *hostname, char *path, char *port);
 void build_request_header(rio_t *rio, char *header, char *path);
 
 int main(int argc, char **argv)
 {
-  int listenfd, connfd;
+  int listen_fd;
+  int *conn_fd_p;
   struct sockaddr_storage clientaddr;
-  socklen_t clientlen;
   char hostname[MAXLINE], port[MAXLINE];
+  int clientlen = sizeof(clientaddr);
+  pthread_t tid;
 
   // Check command line arguments
   if (argc != 2)
@@ -24,27 +28,45 @@ int main(int argc, char **argv)
   }
 
   // Listen for connections
-  listenfd = Open_listenfd(argv[1]);
+  listen_fd = Open_listenfd(argv[1]);
 
   // Execute server loop
   while (1)
   {
+    // Allocate a memory for connection descriptor
+    conn_fd_p = Malloc(sizeof(int));
+    if (conn_fd_p == NULL)
+    {
+      fprintf(stderr, "Memory allocation failed.\n");
+      exit(1);
+    }
+
     // Accept a connection
-    clientlen = sizeof(clientaddr);
-    connfd = Accept(listenfd, (SA *)&clientaddr, &clientlen);
-    Getnameinfo((SA *)&clientaddr, clientlen, hostname, MAXLINE, port, MAXLINE, 0);
-    printf("Accepted connection from (%s, %s)\n", hostname, port);
+    *conn_fd_p = Accept(listen_fd, (SA *)&clientaddr, (socklen_t *)&clientlen);
 
-    // Conduct a transaction with the client
-    handle_client_request(connfd);
-
-    // Close the connection descriptor
-    Close(connfd);
+    // Create a thread
+    Pthread_create(&tid, NULL, handle_thread, conn_fd_p);
   }
 
   return 0;
 }
 
+/*
+Handle each client request in a separate thread
+- This function is called for each new connection.
+- After processing it frees allocated resources and terminates thread.
+*/
+void *handle_thread(int *socket_fd_pointer)
+{
+  int conn_fd = *((int *)socket_fd_pointer);
+  Pthread_detach(pthread_self());
+  Free(socket_fd_pointer);
+  handle_client_request(conn_fd);
+  Close(conn_fd);
+  return NULL;
+}
+
+/* Handle the request of client */
 void handle_client_request(int clientfd)
 {
   rio_t rio_client, rio_server; // Robust I/O package
@@ -108,7 +130,7 @@ void parse(const char *uri, char *hostname, char *path, char *port)
   }
   else
   {
-    strcpy(port, "80");
+    strcpy(port, HTTP_PORT);
   }
 }
 
@@ -116,7 +138,7 @@ void parse(const char *uri, char *hostname, char *path, char *port)
 void build_request_header(rio_t *rio, char *header, char *path)
 {
   char buf[MAXLINE];
-  // Modify http version from 1.0 to 1.1
+  // Modify http version from 1.1 to 1.0
   sprintf(header, "GET %s HTTP/1.0\r\n", path);
   // Copy rest of header except above one
   while (Rio_readlineb(rio, buf, MAXLINE) > 2)
