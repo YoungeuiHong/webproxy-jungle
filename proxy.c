@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include "csapp.h"
+#include "cache.h"
 
 /* Recommended max cache and object sizes */
 #define MAX_CACHE_SIZE 1049000
@@ -10,6 +11,9 @@ void *handle_thread(int *socket_fd_pointer);
 void handle_client_request(int clientfd);
 void parse(const char *uri, char *hostname, char *path, char *port);
 void build_request_header(rio_t *rio, char *header, char *path);
+
+/* Global Variables */
+cache* cache_list;
 
 int main(int argc, char **argv)
 {
@@ -29,6 +33,9 @@ int main(int argc, char **argv)
 
   // Listen for connections
   listen_fd = Open_listenfd(argv[1]);
+
+  // Initiate cache list
+  cache_list = init_cache();
 
   // Execute server loop
   while (1)
@@ -70,7 +77,7 @@ void *handle_thread(int *socket_fd_pointer)
 void handle_client_request(int clientfd)
 {
   rio_t rio_client, rio_server; // Robust I/O package
-  char request_buf[MAXLINE], header_buf[MAXLINE], response_buf[MAXLINE];
+  char request_buf[MAXLINE], header_buf[MAXLINE], response_buf[MAXLINE], cache_buf[MAXLINE];
   char method[MAXLINE], uri[MAXLINE], version[MAXLINE];
   char hostname[MAXLINE], port[MAXLINE], path[MAXLINE];
   int proxyfd;
@@ -82,6 +89,15 @@ void handle_client_request(int clientfd)
     return;
   }
   sscanf(request_buf, "%s %s %s", method, uri, version);
+
+  // If cached data exists, return the cached data
+  node *cached_node = find_cache(cache_list, uri);
+  if (cached_node != NULL) 
+  {
+    Rio_writen(clientfd, cached_node->data, cached_node->size);
+    return;
+  }
+
   parse(uri, hostname, path, port);
 
   build_request_header(&rio_client, header_buf, path);
@@ -95,8 +111,12 @@ void handle_client_request(int clientfd)
   size_t n;
   while ((n = Rio_readnb(&rio_server, response_buf, MAXLINE)) > 0)
   {
+    sprintf(cache_buf, "%s%s", cache_buf, response_buf);
     Rio_writen(clientfd, response_buf, n);
   }
+
+  // Store the server's response in the cache
+  add_cache(cache_list, uri, cache_buf, sizeof(cache_buf));
 }
 
 /* Parse URI to extract host name, path, and port */
